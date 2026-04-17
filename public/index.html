@@ -1,0 +1,764 @@
+<\!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HERGON POS - Sistema de Gestión</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e}
+    :root{--p:#1a56db;--pd:#1e3a8a;--ok:#059669;--warn:#d97706;--err:#dc2626;--bg:#f0f2f5;--card:#fff;--brd:#e5e7eb;--txt:#1a1a2e;--txtl:#6b7280}
+    .sidebar{width:230px;background:linear-gradient(180deg,#1e3a5f,#0f1b2d);color:#fff;height:100vh;position:fixed;left:0;top:0;z-index:100;display:flex;flex-direction:column}
+    .sidebar-logo{padding:18px;text-align:center;border-bottom:1px solid rgba(255,255,255,.1)}
+    .sidebar-logo h2{font-size:17px;color:#60a5fa}.sidebar-logo small{color:#94a3b8;font-size:11px}
+    .sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
+    .nav-item{display:flex;align-items:center;padding:11px 18px;color:#cbd5e1;cursor:pointer;transition:.2s;border-left:3px solid transparent;font-size:13px}
+    .nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .nav-item.active{background:rgba(96,165,250,.15);color:#60a5fa;border-left-color:#60a5fa}
+    .nav-item i{width:22px;margin-right:10px;text-align:center}
+    .nav-div{height:1px;background:rgba(255,255,255,.08);margin:6px 14px}
+    .sb-footer{padding:12px;border-top:1px solid rgba(255,255,255,.1);font-size:12px;color:#94a3b8}
+    .sb-footer .uname{color:#fff;font-weight:600;font-size:13px}
+    .main{margin-left:230px;min-height:100vh}
+    .topbar{background:#fff;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--brd);position:sticky;top:0;z-index:50}
+    .topbar h1{font-size:18px;font-weight:700}
+    .topbar-act{display:flex;align-items:center;gap:14px}
+    .badge{background:var(--err);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:flex;align-items:center;justify-content:center;position:absolute;top:-4px;right:-4px}
+    .nbtn{position:relative;background:none;border:none;cursor:pointer;font-size:18px;color:var(--txtl);padding:4px}
+    .content{padding:20px}
+    .card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid var(--brd);margin-bottom:14px}
+    .card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .card-title{font-size:15px;font-weight:700}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+    .stat-card{background:#fff;border-radius:10px;padding:16px;border:1px solid var(--brd)}
+    .stat-card .sv{font-size:26px;font-weight:800;color:var(--p)}
+    .stat-card .sl{font-size:12px;color:var(--txtl);margin-top:2px}
+    .stat-card .si{font-size:28px;color:#93c5fd;float:right;margin-top:-6px}
+    .btn{padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:5px}
+    .btn-p{background:var(--p);color:#fff}.btn-p:hover{background:var(--pd)}
+    .btn-ok{background:var(--ok);color:#fff}.btn-ok:hover{background:#047857}
+    .btn-w{background:var(--warn);color:#fff}.btn-err{background:var(--err);color:#fff}
+    .btn-o{background:transparent;border:1px solid var(--brd);color:var(--txt)}.btn-o:hover{background:#f9fafb}
+    .btn-sm{padding:4px 8px;font-size:11px}.btn-lg{padding:10px 20px;font-size:15px}
+    input,select,textarea{padding:7px 10px;border:1px solid var(--brd);border-radius:7px;font-size:13px;width:100%;transition:.2s;font-family:inherit}
+    input:focus,select:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+    .fg{margin-bottom:10px}.fg label{display:block;font-size:12px;font-weight:600;color:var(--txtl);margin-bottom:3px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f8fafc;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txtl);text-transform:uppercase;border-bottom:2px solid var(--brd)}
+    td{padding:8px 10px;border-bottom:1px solid var(--brd);font-size:13px}
+    tr:hover{background:#f8fafc}
+    .pill{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+    .pill-g{background:#dcfce7;color:#166534}.pill-y{background:#fef9c3;color:#854d0e}.pill-r{background:#fee2e2;color:#991b1b}
+    .pill-b{background:#dbeafe;color:#1e40af}.pill-gr{background:#f3f4f6;color:#374151}
+    .modal-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+    .modal{background:#fff;border-radius:14px;padding:22px;max-width:560px;width:92%;max-height:85vh;overflow-y:auto}
+    .modal-lg{max-width:850px}.modal h3{font-size:17px;margin-bottom:14px}
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .login-pg{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e3a5f,#0f1b2d)}
+    .login-c{background:#fff;border-radius:18px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .login-c h1{text-align:center;color:var(--pd);margin-bottom:6px}
+    .login-c .sub{text-align:center;color:var(--txtl);margin-bottom:20px;font-size:13px}
+    .login-err{background:#fee2e2;color:#991b1b;padding:8px;border-radius:7px;margin-bottom:10px;font-size:12px}
+    .sbar{display:flex;gap:8px;margin-bottom:14px}.sbar input{flex:1}
+    .pos-lay{display:grid;grid-template-columns:1fr 360px;gap:14px;height:calc(100vh - 120px)}
+    .pos-prods{overflow-y:auto}.pos-cart{display:flex;flex-direction:column}
+    .cart-items{flex:1;overflow-y:auto}
+    .cart-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--brd);font-size:13px}
+    .cart-total{border-top:2px solid var(--txt);padding-top:10px;margin-top:6px}
+    .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+    .pcard{background:#fff;border:1px solid var(--brd);border-radius:8px;padding:12px;cursor:pointer;transition:.2s}
+    .pcard:hover{border-color:var(--p);box-shadow:0 2px 8px rgba(26,86,219,.1);transform:translateY(-1px)}
+    .pcard .ck{font-size:10px;color:var(--p);font-weight:700}.pcard .nm{font-size:13px;font-weight:600;margin:3px 0}
+    .pcard .pr{font-size:15px;font-weight:800;color:var(--ok)}.pcard .stk{font-size:11px;color:var(--txtl)}
+    .npanel{position:fixed;right:0;top:0;width:360px;height:100vh;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.1);z-index:150;overflow-y:auto;padding:18px;transform:translateX(100%);transition:.3s}
+    .npanel.open{transform:translateX(0)}
+    .nitem{padding:10px;border-radius:7px;margin-bottom:6px;border-left:4px solid var(--brd);font-size:12px}
+    .nitem.unread{background:#eff6ff}
+    .nitem.t-venta{border-color:var(--ok)}.nitem.t-stock_bajo{border-color:var(--warn)}.nitem.t-stock_cero{border-color:var(--err)}
+    .nitem.t-traspaso{border-color:var(--p)}.nitem.t-corte_caja{border-color:#8b5cf6}.nitem.t-devolucion{border-color:#ec4899}
+    .ticket{font-family:'Courier New',monospace;font-size:12px;max-width:300px;margin:0 auto}
+    .ticket .ctr{text-align:center}.ticket .ln{border-top:1px dashed #000;margin:6px 0}
+    .ticket table{width:100%;font-size:11px}.ticket td{padding:1px 0;border:none}
+    .qc{display:flex;align-items:center;gap:3px}
+    .qc button{width:26px;height:26px;border:1px solid var(--brd);border-radius:5px;background:#fff;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center}
+    .qc span{min-width:28px;text-align:center;font-weight:700;font-size:13px}
+    .empty{text-align:center;padding:36px;color:var(--txtl)}.empty i{font-size:42px;margin-bottom:12px;color:#d1d5db;display:block}
+    .tab-bar{display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--brd)}
+    .tab{padding:8px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txtl);border-bottom:2px solid transparent;margin-bottom:-2px;transition:.2s}
+    .tab.active{color:var(--p);border-bottom-color:var(--p)}.tab:hover:not(.active){color:var(--txt)}
+    @media print{.sidebar,.topbar,.no-print{display:none\!important}.main{margin-left:0\!important}.content{padding:0\!important}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+const API=window.location.origin+'/api';
+const socket=io(window.location.origin);
+
+// === API Helper ===
+async function api(path,opts={}){
+  const tk=localStorage.getItem('token');
+  const h={'Content-Type':'application/json'};
+  if(tk)h['Authorization']='Bearer '+tk;
+  const r=await fetch(API+path,{...opts,headers:{...h,...(opts.headers||{})}});
+  const d=await r.json();
+  if(\!r.ok)throw new Error(d.error||'Error');
+  return d;
+}
+
+// === LOGIN ===
+function Login({onLogin}){
+  const[u,setU]=useState('');const[p,setP]=useState('');const[err,setErr]=useState('');
+  const submit=async e=>{e.preventDefault();setErr('');
+    try{const d=await api('/auth/login',{method:'POST',body:JSON.stringify({usuario:u,password:p})});
+      localStorage.setItem('token',d.token);localStorage.setItem('user',JSON.stringify(d.user));onLogin(d.user);
+    }catch(e){setErr(e.message)}};
+  return(<div className="login-pg"><div className="login-c">
+    <h1><i className="fas fa-tools" style={{color:'#1a56db'}}/> HERGON</h1>
+    <p className="sub">Sistema de Gestión - Punto de Venta</p>
+    {err&&<div className="login-err">{err}</div>}
+    <form onSubmit={submit}>
+      <div className="fg"><label>Usuario</label><input value={u} onChange={e=>setU(e.target.value)} placeholder="admin" autoFocus/></div>
+      <div className="fg"><label>Contraseña</label><input type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="admin123"/></div>
+      <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:8}}>Iniciar Sesión</button>
+    </form>
+    <div style={{marginTop:16,fontSize:11,color:'#94a3b8',textAlign:'center'}}>
+      <b>Admin:</b> admin / admin123 &nbsp;|&nbsp; <b>Cajero:</b> maria / cajero123
+    </div>
+  </div></div>);
+}
+
+// === SIDEBAR ===
+function Sidebar({page,setPage,user,onLogout}){
+  const isAdmin=user.rol==='administrador';
+  const items=[
+    {id:'dashboard',icon:'fa-chart-pie',label:'Dashboard'},
+    {id:'pos',icon:'fa-cash-register',label:'Punto de Venta'},
+    {id:'inventario',icon:'fa-boxes-stacked',label:'Inventario'},
+    {id:'cortes',icon:'fa-receipt',label:'Cortes de Caja'},
+    {id:'div1'},
+    ...(isAdmin?[{id:'clientes',icon:'fa-users',label:'Clientes'},{id:'promociones',icon:'fa-tags',label:'Promociones'},{id:'usuarios',icon:'fa-user-gear',label:'Usuarios'},{id:'reportes',icon:'fa-chart-bar',label:'Reportes'}]:[{id:'clientes',icon:'fa-users',label:'Clientes'}]),
+  ];
+  return(<div className="sidebar">
+    <div className="sidebar-logo"><h2><i className="fas fa-tools"/> HERGON POS</h2><small>Tornillos y Hules Automotrices</small></div>
+    <div className="sidebar-nav">
+      {items.map((it,i)=>it.id.startsWith('div')?<div key={i} className="nav-div"/>:
+        <div key={it.id} className={`nav-item ${page===it.id?'active':''}`} onClick={()=>setPage(it.id)}>
+          <i className={`fas ${it.icon}`}/>{it.label}
+        </div>)}
+    </div>
+    <div className="sb-footer">
+      <div className="uname">{user.nombre}</div>
+      <div>{user.sucursal_nombre} · {user.rol==='administrador'?'Admin':'Cajero'}</div>
+      <button className="btn btn-o btn-sm" style={{marginTop:8,width:'100%'}} onClick={onLogout}><i className="fas fa-sign-out-alt"/> Cerrar sesión</button>
+    </div>
+  </div>);
+}
+
+// === DASHBOARD ===
+function Dashboard(){
+  const[d,setD]=useState(null);
+  useEffect(()=>{api('/dashboard').then(setD).catch(console.error)},[]);
+  if(\!d)return <div className="content"><p>Cargando...</p></div>;
+  return(<div className="content">
+    <div className="stats-grid">
+      <div className="stat-card"><i className="fas fa-shopping-cart si"/><div className="sv">{d.ventas_hoy.num}</div><div className="sl">Ventas hoy</div></div>
+      <div className="stat-card"><i className="fas fa-dollar-sign si"/><div className="sv">${Number(d.ventas_hoy.monto).toFixed(2)}</div><div className="sl">Monto total hoy</div></div>
+      <div className="stat-card"><i className="fas fa-exclamation-triangle si" style={{color:'#fbbf24'}}/><div className="sv" style={{color:'var(--warn)'}}>{d.alertas_stock}</div><div className="sl">Alertas de stock</div></div>
+      <div className="stat-card"><i className="fas fa-box si"/><div className="sv">{d.total_productos}</div><div className="sl">Productos activos</div></div>
+    </div>
+    <div className="card"><div className="card-hdr"><span className="card-title">Ventas por Sucursal (Hoy)</span></div>
+      <table><thead><tr><th>Sucursal</th><th>Ventas</th><th>Monto</th></tr></thead>
+        <tbody>{d.ventas_por_sucursal.map((s,i)=><tr key={i}><td>{s.nombre}</td><td>{s.ventas}</td><td>${Number(s.monto).toFixed(2)}</td></tr>)}</tbody>
+      </table>
+    </div>
+  </div>);
+}
+
+// === POS ===
+function POS({user}){
+  const[prods,setProds]=useState([]);const[q,setQ]=useState('');const[cat,setCat]=useState('');
+  const[cats,setCats]=useState([]);const[cart,setCart]=useState([]);const[cliente,setCliente]=useState(null);
+  const[clientes,setClientes]=useState([]);const[tipoPago,setTipoPago]=useState('efectivo');
+  const[showTicket,setShowTicket]=useState(null);const[showPin,setShowPin]=useState(false);
+  const[pin,setPin]=useState('');const[pinErr,setPinErr]=useState('');const[searchCli,setSearchCli]=useState('');
+  const[showCli,setShowCli]=useState(false);
+
+  useEffect(()=>{api('/categorias').then(setCats).catch(console.error)},[]);
+  useEffect(()=>{const t=setTimeout(()=>{api(`/productos?q=${q}&categoria_id=${cat}&sucursal_id=${user.sucursal_id}`).then(setProds)},300);return()=>clearTimeout(t)},[q,cat]);
+
+  const addToCart=(prod)=>{
+    setCart(c=>{const ex=c.find(i=>i.producto_id===prod.id);
+      if(ex)return c.map(i=>i.producto_id===prod.id?{...i,cantidad:i.cantidad+1}:i);
+      return[...c,{producto_id:prod.id,clave:prod.clave,nombre:prod.nombre,cantidad:1,precio:prod.precio_menudeo,stock:prod.stock_local,
+        p_men:prod.precio_menudeo,p_mmed:prod.precio_medio_mayoreo,p_may:prod.precio_mayoreo,c_mmed:prod.cantidad_medio_mayoreo,c_may:prod.cantidad_mayoreo}];
+    });
+  };
+  const updQty=(pid,delta)=>{setCart(c=>c.map(i=>{
+    if(i.producto_id\!==pid)return i;
+    const nq=Math.max(0,i.cantidad+delta);
+    let pr=i.p_men;if(nq>=i.c_may)pr=i.p_may;else if(nq>=i.c_mmed)pr=i.p_mmed;
+    return nq===0?null:{...i,cantidad:nq,precio:pr};
+  }).filter(Boolean))};
+  const removeItem=pid=>setCart(c=>c.filter(i=>i.producto_id\!==pid));
+  const subtotal=cart.reduce((s,i)=>s+i.precio*i.cantidad,0);
+
+  const completeSale=async(adminId)=>{
+    try{
+      const body={items:cart.map(i=>({producto_id:i.producto_id,cantidad:i.cantidad})),tipo_pago:tipoPago,cliente_id:cliente?.id||null};
+      if(adminId)body.autorizado_por=adminId;
+      const venta=await api('/ventas',{method:'POST',body:JSON.stringify(body)});
+      setShowTicket(venta);setCart([]);setCliente(null);setTipoPago('efectivo');
+      // refresh products
+      api(`/productos?q=${q}&categoria_id=${cat}&sucursal_id=${user.sucursal_id}`).then(setProds);
+    }catch(e){alert('Error: '+e.message)}
+  };
+
+  const handlePay=()=>{
+    if(cart.length===0)return alert('Agrega productos al carrito');
+    if(tipoPago==='tarjeta'&&user.rol\!=='administrador'){setShowPin(true);setPin('');setPinErr('');return}
+    completeSale();
+  };
+  const verifyPin=async()=>{
+    try{const r=await api('/auth/verify-pin',{method:'POST',body:JSON.stringify({pin})});setShowPin(false);completeSale(r.admin_id)}
+    catch(e){setPinErr(e.message)}
+  };
+  const searchClientes=async()=>{try{const c=await api(`/clientes?q=${searchCli}`);setClientes(c)}catch(e){}};
+
+  return(<div className="content no-print">
+    <div className="pos-lay">
+      <div className="pos-prods">
+        <div className="sbar">
+          <input placeholder="Buscar por clave o nombre..." value={q} onChange={e=>setQ(e.target.value)}/>
+          <select style={{width:180}} value={cat} onChange={e=>setCat(e.target.value)}>
+            <option value="">Todas las categorías</option>
+            {cats.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </div>
+        <div className="pgrid">
+          {prods.map(p=><div key={p.id} className="pcard" onClick={()=>p.stock_local>0&&addToCart(p)}>
+            <div className="ck">{p.clave}</div><div className="nm">{p.nombre}</div>
+            <div className="pr">${p.precio_menudeo.toFixed(2)}</div>
+            <div className="stk" style={{color:p.stock_local<=0?'var(--err)':p.stock_local<=p.stock_minimo?'var(--warn)':'var(--txtl)'}}>
+              Stock: {p.stock_local} {p.stock_local<=0&&'· SIN STOCK'}
+            </div>
+          </div>)}
+          {prods.length===0&&<div className="empty" style={{gridColumn:'1/-1'}}><i className="fas fa-search"/><p>Busca productos para agregar</p></div>}
+        </div>
+      </div>
+      <div className="pos-cart card" style={{display:'flex',flexDirection:'column'}}>
+        <div className="card-hdr"><span className="card-title"><i className="fas fa-shopping-cart"/> Carrito</span>
+          <span className="pill pill-b">{cart.length} items</span>
+        </div>
+        {/* Cliente */}
+        <div style={{marginBottom:10,fontSize:12}}>
+          <div style={{display:'flex',gap:4,marginBottom:4}}>
+            <button className="btn btn-o btn-sm" onClick={()=>{setShowCli(true);searchClientes()}}><i className="fas fa-user-plus"/> {cliente?cliente.nombre:'Asignar cliente'}</button>
+            {cliente&&<button className="btn btn-sm btn-err" onClick={()=>setCliente(null)}>×</button>}
+          </div>
+        </div>
+        <div className="cart-items">
+          {cart.map(i=><div key={i.producto_id} className="cart-item">
+            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12}}>{i.clave}</div><div style={{fontSize:11,color:'var(--txtl)'}}>{i.nombre}</div>
+              <div style={{fontSize:11,color:'var(--ok)'}}>${i.precio.toFixed(2)} c/u</div>
+            </div>
+            <div className="qc">
+              <button onClick={()=>updQty(i.producto_id,-1)}>-</button><span>{i.cantidad}</span><button onClick={()=>i.cantidad<i.stock&&updQty(i.producto_id,1)}>+</button>
+              <button onClick={()=>removeItem(i.producto_id)} style={{color:'var(--err)',border:'none',background:'none',cursor:'pointer'}}><i className="fas fa-trash"/></button>
+            </div>
+            <div style={{minWidth:65,textAlign:'right',fontWeight:700,fontSize:13}}>${(i.precio*i.cantidad).toFixed(2)}</div>
+          </div>)}
+          {cart.length===0&&<div className="empty"><i className="fas fa-cart-plus"/><p>Carrito vacío</p></div>}
+        </div>
+        <div className="cart-total">
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:18,fontWeight:800}}>
+            <span>TOTAL:</span><span>${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="fg" style={{marginTop:10}}>
+            <label>Tipo de pago</label>
+            <select value={tipoPago} onChange={e=>setTipoPago(e.target.value)}>
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">📱 Transferencia</option>
+              <option value="tarjeta">💳 Tarjeta</option>
+            </select>
+          </div>
+          <button className="btn btn-ok btn-lg" style={{width:'100%',marginTop:6}} onClick={handlePay}>
+            <i className="fas fa-check-circle"/> Cobrar ${subtotal.toFixed(2)}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* PIN Modal */}
+    {showPin&&<div className="modal-ov"><div className="modal" style={{maxWidth:340}}>
+      <h3><i className="fas fa-lock"/> Autorización requerida</h3>
+      <p style={{fontSize:13,marginBottom:12}}>El pago con tarjeta requiere PIN de administrador.</p>
+      {pinErr&&<div className="login-err">{pinErr}</div>}
+      <input type="password" placeholder="PIN de administrador" value={pin} onChange={e=>setPin(e.target.value)} autoFocus onKeyDown={e=>e.key==='Enter'&&verifyPin()}/>
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button className="btn btn-ok" onClick={verifyPin}>Autorizar</button>
+        <button className="btn btn-o" onClick={()=>setShowPin(false)}>Cancelar</button>
+      </div>
+    </div></div>}
+
+    {/* Cliente Modal */}
+    {showCli&&<div className="modal-ov"><div className="modal">
+      <h3>Seleccionar Cliente</h3>
+      <div className="sbar"><input placeholder="Buscar cliente..." value={searchCli} onChange={e=>setSearchCli(e.target.value)} onKeyDown={e=>e.key==='Enter'&&searchClientes()}/><button className="btn btn-p" onClick={searchClientes}>Buscar</button></div>
+      <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Membresía</th><th></th></tr></thead>
+        <tbody>{clientes.map(c=><tr key={c.id}><td>{c.nombre}</td><td>{c.telefono||'-'}</td>
+          <td>{c.membresia_nombre?<span className="pill pill-b">{c.membresia_nombre} ({c.descuento}%)</span>:'-'}</td>
+          <td><button className="btn btn-p btn-sm" onClick={()=>{setCliente(c);setShowCli(false)}}>Seleccionar</button></td></tr>)}</tbody>
+      </table>
+      <button className="btn btn-o" style={{marginTop:10}} onClick={()=>setShowCli(false)}>Cerrar</button>
+    </div></div>}
+
+    {/* Ticket Modal */}
+    {showTicket&&<div className="modal-ov"><div className="modal">
+      <div className="ticket" id="ticket-print">
+        <div className="ctr"><b>TORNILLOS Y HULES</b><br/>AUTOMOTRICES HERGON<br/>{showTicket.sucursal_nombre}<br/>{showTicket.sucursal_direccion}</div>
+        <div className="ln"/>
+        <div><b>Ticket:</b> {showTicket.ticket_numero}<br/><b>Fecha:</b> {new Date(showTicket.created_at).toLocaleString('es-MX')}<br/><b>Cajero:</b> {showTicket.cajero_nombre}
+          {showTicket.cliente_nombre&&<><br/><b>Cliente:</b> {showTicket.cliente_nombre}</>}
+        </div>
+        <div className="ln"/>
+        <table><thead><tr><td><b>Prod</b></td><td><b>Cant</b></td><td><b>P.U.</b></td><td style={{textAlign:'right'}}><b>Subt</b></td></tr></thead>
+          <tbody>{showTicket.detalles.map((d,i)=><tr key={i}><td>{d.clave}</td><td>{d.cantidad}</td><td>${d.precio_unitario.toFixed(2)}</td><td style={{textAlign:'right'}}>${d.subtotal.toFixed(2)}</td></tr>)}</tbody>
+        </table>
+        <div className="ln"/>
+        {showTicket.descuento_promocion>0&&<div>Desc. promoción: -${showTicket.descuento_promocion.toFixed(2)}</div>}
+        {showTicket.descuento_membresia>0&&<div>Desc. membresía: -${showTicket.descuento_membresia.toFixed(2)}</div>}
+        <div style={{fontSize:16,fontWeight:800}}>TOTAL: ${showTicket.total.toFixed(2)}</div>
+        <div>Pago: {showTicket.tipo_pago.toUpperCase()}</div>
+        <div className="ln"/><div className="ctr">¡Gracias por su compra\!</div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'center'}} className="no-print">
+        <button className="btn btn-p" onClick={()=>window.print()}><i className="fas fa-print"/> Imprimir</button>
+        <button className="btn btn-o" onClick={()=>setShowTicket(null)}>Cerrar</button>
+      </div>
+    </div></div>}
+  </div>);
+}
+
+// === INVENTARIO ===
+function Inventario({user}){
+  const[inv,setInv]=useState([]);const[suc,setSuc]=useState('');const[bajo,setBajo]=useState(false);
+  const[sucs,setSucs]=useState([]);const[showEntrada,setShowEntrada]=useState(false);const[showTraspaso,setShowTraspaso]=useState(false);
+  const[entProd,setEntProd]=useState('');const[entCant,setEntCant]=useState('');const[entSuc,setEntSuc]=useState('');
+  const[trProd,setTrProd]=useState('');const[trOrig,setTrOrig]=useState('');const[trDest,setTrDest]=useState('');const[trCant,setTrCant]=useState('');
+  const[prods,setProds]=useState([]);
+  const isAdmin=user.rol==='administrador';
+
+  const load=()=>api(`/inventario?sucursal_id=${suc}&bajo_stock=${bajo?1:0}`).then(setInv);
+  useEffect(()=>{load();api('/sucursales').then(setSucs)},[suc,bajo]);
+
+  const doEntrada=async()=>{
+    try{await api('/inventario/entrada',{method:'POST',body:JSON.stringify({producto_id:parseInt(entProd),sucursal_id:parseInt(entSuc||user.sucursal_id),cantidad:parseInt(entCant)})});
+      setShowEntrada(false);load();alert('Entrada registrada');}catch(e){alert(e.message)}};
+  const doTraspaso=async()=>{
+    try{await api('/inventario/traspaso',{method:'POST',body:JSON.stringify({producto_id:parseInt(trProd),sucursal_origen_id:parseInt(trOrig),sucursal_destino_id:parseInt(trDest),cantidad:parseInt(trCant)})});
+      setShowTraspaso(false);load();alert('Traspaso realizado');}catch(e){alert(e.message)}};
+  const loadProds=()=>api('/productos').then(setProds);
+
+  return(<div className="content">
+    <div className="card">
+      <div className="card-hdr"><span className="card-title"><i className="fas fa-boxes-stacked"/> Inventario</span>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-ok" onClick={()=>{setShowEntrada(true);loadProds()}}><i className="fas fa-plus"/> Entrada</button>
+          {isAdmin&&<button className="btn btn-p" onClick={()=>{setShowTraspaso(true);loadProds()}}><i className="fas fa-exchange-alt"/> Traspaso</button>}
+        </div>
+      </div>
+      <div className="sbar">
+        <select value={suc} onChange={e=>setSuc(e.target.value)} style={{width:200}}>
+          <option value="">Todas las sucursales</option>
+          {sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
+        </select>
+        <label style={{display:'flex',alignItems:'center',gap:4,fontSize:13,whiteSpace:'nowrap'}}>
+          <input type="checkbox" checked={bajo} onChange={e=>setBajo(e.target.checked)} style={{width:'auto'}}/> Solo stock bajo
+        </label>
+      </div>
+      <div style={{overflowX:'auto'}}><table><thead><tr><th>Clave</th><th>Producto</th><th>Categoría</th><th>Sucursal</th><th>Stock</th><th>Mín</th><th>Estado</th></tr></thead>
+        <tbody>{inv.map((r,i)=><tr key={i}>
+          <td><b>{r.clave}</b></td><td>{r.producto_nombre}</td><td>{r.categoria_nombre}</td><td>{r.sucursal_nombre}</td>
+          <td><b>{r.stock}</b></td><td>{r.stock_minimo}</td>
+          <td>{r.stock===0?<span className="pill pill-r">Sin stock</span>:r.stock<=r.stock_minimo?<span className="pill pill-y">Bajo</span>:<span className="pill pill-g">OK</span>}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </div>
+
+    {showEntrada&&<div className="modal-ov"><div className="modal">
+      <h3>Registrar Entrada de Mercancía</h3>
+      <div className="fg"><label>Producto</label><select value={entProd} onChange={e=>setEntProd(e.target.value)}><option value="">Seleccionar...</option>{prods.map(p=><option key={p.id} value={p.id}>{p.clave} - {p.nombre}</option>)}</select></div>
+      <div className="fg"><label>Sucursal</label><select value={entSuc||user.sucursal_id} onChange={e=>setEntSuc(e.target.value)}>{sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
+      <div className="fg"><label>Cantidad</label><input type="number" value={entCant} onChange={e=>setEntCant(e.target.value)} min="1"/></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-ok" onClick={doEntrada}>Registrar</button><button className="btn btn-o" onClick={()=>setShowEntrada(false)}>Cancelar</button></div>
+    </div></div>}
+
+    {showTraspaso&&<div className="modal-ov"><div className="modal">
+      <h3>Traspaso entre Sucursales</h3>
+      <div className="fg"><label>Producto</label><select value={trProd} onChange={e=>setTrProd(e.target.value)}><option value="">Seleccionar...</option>{prods.map(p=><option key={p.id} value={p.id}>{p.clave} - {p.nombre}</option>)}</select></div>
+      <div className="g2">
+        <div className="fg"><label>Sucursal Origen</label><select value={trOrig} onChange={e=>setTrOrig(e.target.value)}><option value="">Seleccionar...</option>{sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
+        <div className="fg"><label>Sucursal Destino</label><select value={trDest} onChange={e=>setTrDest(e.target.value)}><option value="">Seleccionar...</option>{sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
+      </div>
+      <div className="fg"><label>Cantidad</label><input type="number" value={trCant} onChange={e=>setTrCant(e.target.value)} min="1"/></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-p" onClick={doTraspaso}>Traspasar</button><button className="btn btn-o" onClick={()=>setShowTraspaso(false)}>Cancelar</button></div>
+    </div></div>}
+  </div>);
+}
+
+// === CORTES DE CAJA ===
+function Cortes({user}){
+  const[resumen,setResumen]=useState(null);const[cortes,setCortes]=useState([]);const[monto,setMonto]=useState('');const[tab,setTab]=useState('hacer');
+  const isAdmin=user.rol==='administrador';
+  useEffect(()=>{if(tab==='hacer')api('/cortes/resumen').then(setResumen);else api(`/cortes?${isAdmin?'':'cajero_id='+user.id}`).then(setCortes)},[tab]);
+
+  const hacerCorte=async()=>{
+    if(\!monto)return alert('Ingresa el monto en caja');
+    try{const r=await api('/cortes',{method:'POST',body:JSON.stringify({monto_real:parseFloat(monto)})});
+      alert(`Corte registrado. Diferencia: $${r.diferencia.toFixed(2)}`);setMonto('');setTab('historial');
+    }catch(e){alert(e.message)}};
+
+  return(<div className="content">
+    <div className="tab-bar">
+      <div className={`tab ${tab==='hacer'?'active':''}`} onClick={()=>setTab('hacer')}>Realizar Corte</div>
+      <div className={`tab ${tab==='historial'?'active':''}`} onClick={()=>setTab('historial')}>Historial</div>
+    </div>
+    {tab==='hacer'&&resumen&&<div className="card">
+      <h3 style={{marginBottom:14}}>Resumen del Turno Actual</h3>
+      <div className="stats-grid">
+        <div className="stat-card"><div className="sv">{resumen.num_ventas}</div><div className="sl">Ventas</div></div>
+        <div className="stat-card"><div className="sv">${resumen.total_ventas.toFixed(2)}</div><div className="sl">Total vendido</div></div>
+        <div className="stat-card"><div className="sv" style={{color:'var(--ok)'}}>${resumen.total_efectivo.toFixed(2)}</div><div className="sl">Efectivo</div></div>
+        <div className="stat-card"><div className="sv" style={{color:'var(--p)'}}>${resumen.total_transferencia.toFixed(2)}</div><div className="sl">Transferencia</div></div>
+        <div className="stat-card"><div className="sv" style={{color:'#8b5cf6'}}>${resumen.total_tarjeta.toFixed(2)}</div><div className="sl">Tarjeta</div></div>
+        <div className="stat-card"><div className="sv" style={{color:'var(--err)'}}>${resumen.total_devoluciones.toFixed(2)}</div><div className="sl">Devoluciones</div></div>
+      </div>
+      <div style={{background:'#f0fdf4',padding:14,borderRadius:8,marginBottom:14}}>
+        <b>Monto esperado en caja (efectivo - devoluciones): ${resumen.monto_esperado.toFixed(2)}</b>
+      </div>
+      <div className="fg"><label>Monto real en caja</label><input type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder="0.00" step="0.01"/></div>
+      {monto&&<div style={{padding:8,borderRadius:6,background:Math.abs(parseFloat(monto)-resumen.monto_esperado)>1?'#fef2f2':'#f0fdf4',marginBottom:10}}>
+        Diferencia: <b>${(parseFloat(monto||0)-resumen.monto_esperado).toFixed(2)}</b>
+      </div>}
+      <button className="btn btn-ok btn-lg" onClick={hacerCorte}><i className="fas fa-check"/> Confirmar Corte</button>
+    </div>}
+    {tab==='historial'&&<div className="card">
+      <table><thead><tr><th>Fecha</th><th>Cajero</th><th>Sucursal</th><th>Ventas</th><th>Total</th><th>Esperado</th><th>Real</th><th>Diferencia</th></tr></thead>
+        <tbody>{cortes.map(c=><tr key={c.id}>
+          <td>{new Date(c.created_at).toLocaleString('es-MX')}</td><td>{c.cajero_nombre}</td><td>{c.sucursal_nombre}</td>
+          <td>{c.num_ventas}</td><td>${c.total_ventas.toFixed(2)}</td><td>${c.monto_esperado.toFixed(2)}</td><td>${c.monto_real.toFixed(2)}</td>
+          <td style={{color:Math.abs(c.diferencia)>1?'var(--err)':'var(--ok)',fontWeight:700}}>${c.diferencia.toFixed(2)}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+  </div>);
+}
+
+// === CLIENTES ===
+function Clientes({user}){
+  const[cls,setCls]=useState([]);const[q,setQ]=useState('');const[show,setShow]=useState(false);const[edit,setEdit]=useState(null);
+  const[membs,setMembs]=useState([]);const[historial,setHistorial]=useState(null);const[histData,setHistData]=useState([]);
+  const[f,setF]=useState({nombre:'',telefono:'',email:'',membresia_id:''});
+
+  const load=()=>api(`/clientes?q=${q}`).then(setCls);
+  useEffect(()=>{load();api('/tipos-membresia').then(setMembs)},[q]);
+
+  const save=async()=>{
+    try{
+      if(edit)await api(`/clientes/${edit.id}`,{method:'PUT',body:JSON.stringify(f)});
+      else await api('/clientes',{method:'POST',body:JSON.stringify(f)});
+      setShow(false);setEdit(null);load();
+    }catch(e){alert(e.message)}};
+  const openEdit=c=>{setEdit(c);setF({nombre:c.nombre,telefono:c.telefono||'',email:c.email||'',membresia_id:c.membresia_id||''});setShow(true)};
+  const openNew=()=>{setEdit(null);setF({nombre:'',telefono:'',email:'',membresia_id:''});setShow(true)};
+  const verHist=async c=>{setHistorial(c);const d=await api(`/clientes/${c.id}/historial`);setHistData(d)};
+
+  return(<div className="content">
+    <div className="card">
+      <div className="card-hdr"><span className="card-title"><i className="fas fa-users"/> Clientes</span>
+        <button className="btn btn-p" onClick={openNew}><i className="fas fa-plus"/> Nuevo</button></div>
+      <div className="sbar"><input placeholder="Buscar cliente..." value={q} onChange={e=>setQ(e.target.value)}/></div>
+      <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Membresía</th><th>Descuento</th><th>Acciones</th></tr></thead>
+        <tbody>{cls.map(c=><tr key={c.id}><td><b>{c.nombre}</b></td><td>{c.telefono||'-'}</td>
+          <td>{c.membresia_nombre?<span className="pill pill-b">{c.membresia_nombre}</span>:'-'}</td>
+          <td>{c.descuento?c.descuento+'%':'-'}</td>
+          <td><button className="btn btn-o btn-sm" onClick={()=>openEdit(c)}>Editar</button>{' '}<button className="btn btn-p btn-sm" onClick={()=>verHist(c)}>Historial</button></td></tr>)}</tbody>
+      </table>
+    </div>
+
+    {show&&<div className="modal-ov"><div className="modal">
+      <h3>{edit?'Editar':'Nuevo'} Cliente</h3>
+      <div className="fg"><label>Nombre</label><input value={f.nombre} onChange={e=>setF({...f,nombre:e.target.value})}/></div>
+      <div className="g2">
+        <div className="fg"><label>Teléfono</label><input value={f.telefono} onChange={e=>setF({...f,telefono:e.target.value})}/></div>
+        <div className="fg"><label>Email</label><input value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></div>
+      </div>
+      <div className="fg"><label>Membresía</label><select value={f.membresia_id} onChange={e=>setF({...f,membresia_id:e.target.value})}>
+        <option value="">Sin membresía</option>{membs.map(m=><option key={m.id} value={m.id}>{m.nombre} ({m.descuento}%)</option>)}
+      </select></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-ok" onClick={save}>Guardar</button><button className="btn btn-o" onClick={()=>setShow(false)}>Cancelar</button></div>
+    </div></div>}
+
+    {historial&&<div className="modal-ov"><div className="modal modal-lg">
+      <h3>Historial de {historial.nombre}</h3>
+      <table><thead><tr><th>Ticket</th><th>Fecha</th><th>Sucursal</th><th>Total</th><th>Pago</th></tr></thead>
+        <tbody>{histData.map(v=><tr key={v.id}><td>{v.ticket_numero}</td><td>{new Date(v.created_at).toLocaleString('es-MX')}</td>
+          <td>{v.sucursal_nombre}</td><td>${v.total.toFixed(2)}</td><td><span className="pill pill-gr">{v.tipo_pago}</span></td></tr>)}</tbody>
+      </table>
+      {histData.length===0&&<div className="empty"><p>Sin compras registradas</p></div>}
+      <button className="btn btn-o" style={{marginTop:10}} onClick={()=>setHistorial(null)}>Cerrar</button>
+    </div></div>}
+  </div>);
+}
+
+// === PROMOCIONES ===
+function Promociones(){
+  const[promos,setPromos]=useState([]);const[show,setShow]=useState(false);const[cats,setCats]=useState([]);const[prods,setProds]=useState([]);
+  const[f,setF]=useState({nombre:'',tipo:'porcentaje',valor:'',aplica_a:'todo',producto_id:'',categoria_id:'',fecha_inicio:'',fecha_fin:''});
+  const load=()=>api('/promociones').then(setPromos);
+  useEffect(()=>{load();api('/categorias').then(setCats);api('/productos').then(setProds)},[]);
+
+  const save=async()=>{try{await api('/promociones',{method:'POST',body:JSON.stringify({...f,valor:parseFloat(f.valor)})});setShow(false);load()}catch(e){alert(e.message)}};
+  const toggle=async id=>{await api(`/promociones/${id}/toggle`,{method:'PUT'});load()};
+  const hoy=new Date().toISOString().split('T')[0];
+
+  return(<div className="content">
+    <div className="card">
+      <div className="card-hdr"><span className="card-title"><i className="fas fa-tags"/> Promociones</span>
+        <button className="btn btn-p" onClick={()=>{setF({nombre:'',tipo:'porcentaje',valor:'',aplica_a:'todo',producto_id:'',categoria_id:'',fecha_inicio:hoy,fecha_fin:''});setShow(true)}}><i className="fas fa-plus"/> Nueva</button></div>
+      <table><thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Aplica a</th><th>Inicio</th><th>Fin</th><th>Estado</th><th></th></tr></thead>
+        <tbody>{promos.map(p=>{
+          const activa=p.activo&&p.fecha_inicio<=hoy&&p.fecha_fin>=hoy;
+          return <tr key={p.id}><td><b>{p.nombre}</b></td><td>{p.tipo==='porcentaje'?'%':'$'}</td><td>{p.valor}{p.tipo==='porcentaje'?'%':''}</td>
+            <td>{p.aplica_a==='todo'?'Toda la tienda':p.aplica_a==='categoria'?p.categoria_nombre:p.producto_nombre}</td>
+            <td>{p.fecha_inicio}</td><td>{p.fecha_fin}</td>
+            <td>{activa?<span className="pill pill-g">Activa</span>:p.activo?<span className="pill pill-y">Programada</span>:<span className="pill pill-r">Inactiva</span>}</td>
+            <td><button className="btn btn-o btn-sm" onClick={()=>toggle(p.id)}>{p.activo?'Desactivar':'Activar'}</button></td></tr>})}</tbody>
+      </table>
+    </div>
+
+    {show&&<div className="modal-ov"><div className="modal">
+      <h3>Nueva Promoción</h3>
+      <div className="fg"><label>Nombre</label><input value={f.nombre} onChange={e=>setF({...f,nombre:e.target.value})}/></div>
+      <div className="g2">
+        <div className="fg"><label>Tipo descuento</label><select value={f.tipo} onChange={e=>setF({...f,tipo:e.target.value})}><option value="porcentaje">Porcentaje (%)</option><option value="monto_fijo">Monto fijo ($)</option></select></div>
+        <div className="fg"><label>Valor</label><input type="number" value={f.valor} onChange={e=>setF({...f,valor:e.target.value})}/></div>
+      </div>
+      <div className="fg"><label>Aplica a</label><select value={f.aplica_a} onChange={e=>setF({...f,aplica_a:e.target.value})}><option value="todo">Toda la tienda</option><option value="categoria">Categoría</option><option value="producto">Producto</option></select></div>
+      {f.aplica_a==='categoria'&&<div className="fg"><label>Categoría</label><select value={f.categoria_id} onChange={e=>setF({...f,categoria_id:e.target.value})}><option value="">Seleccionar...</option>{cats.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div>}
+      {f.aplica_a==='producto'&&<div className="fg"><label>Producto</label><select value={f.producto_id} onChange={e=>setF({...f,producto_id:e.target.value})}><option value="">Seleccionar...</option>{prods.map(p=><option key={p.id} value={p.id}>{p.clave} - {p.nombre}</option>)}</select></div>}
+      <div className="g2">
+        <div className="fg"><label>Fecha inicio</label><input type="date" value={f.fecha_inicio} onChange={e=>setF({...f,fecha_inicio:e.target.value})}/></div>
+        <div className="fg"><label>Fecha fin</label><input type="date" value={f.fecha_fin} onChange={e=>setF({...f,fecha_fin:e.target.value})}/></div>
+      </div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-ok" onClick={save}>Crear</button><button className="btn btn-o" onClick={()=>setShow(false)}>Cancelar</button></div>
+    </div></div>}
+  </div>);
+}
+
+// === USUARIOS ===
+function Usuarios(){
+  const[users,setUsers]=useState([]);const[sucs,setSucs]=useState([]);const[show,setShow]=useState(false);const[edit,setEdit]=useState(null);
+  const[f,setF]=useState({nombre:'',usuario:'',password:'',rol:'cajero',sucursal_id:'',email:'',pin:'',activo:1});
+  const load=()=>api('/usuarios').then(setUsers);
+  useEffect(()=>{load();api('/sucursales').then(setSucs)},[]);
+
+  const save=async()=>{try{
+    if(edit)await api(`/usuarios/${edit.id}`,{method:'PUT',body:JSON.stringify(f)});
+    else await api('/usuarios',{method:'POST',body:JSON.stringify(f)});
+    setShow(false);setEdit(null);load();}catch(e){alert(e.message)}};
+  const openEdit=u=>{setEdit(u);setF({nombre:u.nombre,usuario:u.usuario,password:'',rol:u.rol,sucursal_id:u.sucursal_id||'',email:u.email||'',pin:'',activo:u.activo});setShow(true)};
+  const openNew=()=>{setEdit(null);setF({nombre:'',usuario:'',password:'',rol:'cajero',sucursal_id:'',email:'',pin:'',activo:1});setShow(true)};
+
+  return(<div className="content">
+    <div className="card">
+      <div className="card-hdr"><span className="card-title"><i className="fas fa-user-gear"/> Usuarios</span>
+        <button className="btn btn-p" onClick={openNew}><i className="fas fa-plus"/> Nuevo</button></div>
+      <table><thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Sucursal</th><th>Estado</th><th></th></tr></thead>
+        <tbody>{users.map(u=><tr key={u.id}><td><b>{u.nombre}</b></td><td>{u.usuario}</td>
+          <td><span className={`pill ${u.rol==='administrador'?'pill-b':'pill-gr'}`}>{u.rol}</span></td>
+          <td>{u.sucursal_nombre||'-'}</td><td>{u.activo?<span className="pill pill-g">Activo</span>:<span className="pill pill-r">Inactivo</span>}</td>
+          <td><button className="btn btn-o btn-sm" onClick={()=>openEdit(u)}>Editar</button></td></tr>)}</tbody>
+      </table>
+    </div>
+
+    {show&&<div className="modal-ov"><div className="modal">
+      <h3>{edit?'Editar':'Nuevo'} Usuario</h3>
+      <div className="g2">
+        <div className="fg"><label>Nombre completo</label><input value={f.nombre} onChange={e=>setF({...f,nombre:e.target.value})}/></div>
+        <div className="fg"><label>Usuario</label><input value={f.usuario} onChange={e=>setF({...f,usuario:e.target.value})} disabled={\!\!edit}/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>{edit?'Nueva contraseña (dejar vacío para no cambiar)':'Contraseña'}</label><input type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></div>
+        <div className="fg"><label>PIN (solo admin)</label><input type="password" value={f.pin} onChange={e=>setF({...f,pin:e.target.value})} maxLength={6}/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Rol</label><select value={f.rol} onChange={e=>setF({...f,rol:e.target.value})}><option value="cajero">Cajero</option><option value="administrador">Administrador</option></select></div>
+        <div className="fg"><label>Sucursal</label><select value={f.sucursal_id} onChange={e=>setF({...f,sucursal_id:e.target.value})}><option value="">Seleccionar...</option>{sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
+      </div>
+      <div className="fg"><label>Email</label><input value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></div>
+      {edit&&<div className="fg"><label style={{display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={f.activo} onChange={e=>setF({...f,activo:e.target.checked?1:0})} style={{width:'auto'}}/> Usuario activo</label></div>}
+      <div style={{display:'flex',gap:8}}><button className="btn btn-ok" onClick={save}>Guardar</button><button className="btn btn-o" onClick={()=>setShow(false)}>Cancelar</button></div>
+    </div></div>}
+  </div>);
+}
+
+// === REPORTES ===
+function Reportes(){
+  const[tab,setTab]=useState('ventas');const[sucs,setSucs]=useState([]);const[users,setUsers]=useState([]);
+  const[filtros,setFiltros]=useState({sucursal_id:'',cajero_id:'',fecha_desde:'',fecha_hasta:'',tipo_pago:'',agrupar:''});
+  const[data,setData]=useState(null);const[top,setTop]=useState([]);const[ventas,setVentas]=useState([]);
+  const[selectedVenta,setSelectedVenta]=useState(null);
+
+  useEffect(()=>{api('/sucursales').then(setSucs);api('/usuarios').then(setUsers).catch(()=>{})},[]);
+
+  const buscar=async()=>{
+    const qs=Object.entries(filtros).filter(([k,v])=>v).map(([k,v])=>`${k}=${v}`).join('&');
+    if(tab==='ventas'){const d=await api(`/reportes/ventas?${qs}`);setData(d)}
+    else if(tab==='top'){const d=await api(`/reportes/productos-top?${qs}`);setTop(d)}
+    else if(tab==='tickets'){const d=await api(`/ventas?${qs}`);setVentas(d)}
+  };
+  const verTicket=async id=>{const v=await api(`/ventas/${id}`);setSelectedVenta(v)};
+
+  return(<div className="content">
+    <div className="tab-bar">
+      <div className={`tab ${tab==='ventas'?'active':''}`} onClick={()=>setTab('ventas')}>Ventas</div>
+      <div className={`tab ${tab==='top'?'active':''}`} onClick={()=>setTab('top')}>Más vendidos</div>
+      <div className={`tab ${tab==='tickets'?'active':''}`} onClick={()=>setTab('tickets')}>Tickets</div>
+    </div>
+    <div className="card">
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+        <select value={filtros.sucursal_id} onChange={e=>setFiltros({...filtros,sucursal_id:e.target.value})} style={{width:180}}><option value="">Todas sucursales</option>{sucs.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select>
+        {tab==='ventas'&&<select value={filtros.agrupar} onChange={e=>setFiltros({...filtros,agrupar:e.target.value})} style={{width:150}}><option value="">Sin agrupar</option><option value="sucursal">Por sucursal</option><option value="cajero">Por cajero</option><option value="dia">Por día</option></select>}
+        <input type="date" value={filtros.fecha_desde} onChange={e=>setFiltros({...filtros,fecha_desde:e.target.value})} style={{width:150}}/>
+        <input type="date" value={filtros.fecha_hasta} onChange={e=>setFiltros({...filtros,fecha_hasta:e.target.value})} style={{width:150}}/>
+        <select value={filtros.tipo_pago} onChange={e=>setFiltros({...filtros,tipo_pago:e.target.value})} style={{width:140}}><option value="">Todo pago</option><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select>
+        <button className="btn btn-p" onClick={buscar}><i className="fas fa-search"/> Buscar</button>
+      </div>
+
+      {tab==='ventas'&&data&&<div>
+        <div className="stats-grid">
+          <div className="stat-card"><div className="sv">{data.resumen.total_ventas}</div><div className="sl">Total ventas</div></div>
+          <div className="stat-card"><div className="sv">${Number(data.resumen.monto_total).toFixed(2)}</div><div className="sl">Monto total</div></div>
+          <div className="stat-card"><div className="sv" style={{color:'var(--ok)'}}>${Number(data.resumen.total_efectivo).toFixed(2)}</div><div className="sl">Efectivo</div></div>
+          <div className="stat-card"><div className="sv" style={{color:'var(--p)'}}>${Number(data.resumen.total_transferencia).toFixed(2)}</div><div className="sl">Transferencia</div></div>
+          <div className="stat-card"><div className="sv" style={{color:'#8b5cf6'}}>${Number(data.resumen.total_tarjeta).toFixed(2)}</div><div className="sl">Tarjeta</div></div>
+        </div>
+        {data.detalle&&data.detalle.length>0&&<table><thead><tr>{filtros.agrupar?<><th>Grupo</th><th>Ventas</th><th>Monto</th></>:<><th>Ticket</th><th>Total</th><th>Pago</th><th>Sucursal</th><th>Cajero</th><th>Fecha</th></>}</tr></thead>
+          <tbody>{data.detalle.map((r,i)=><tr key={i}>{filtros.agrupar?<><td>{r.grupo}</td><td>{r.ventas}</td><td>${Number(r.monto).toFixed(2)}</td></>:
+            <><td>{r.ticket_numero}</td><td>${r.total.toFixed(2)}</td><td><span className="pill pill-gr">{r.tipo_pago}</span></td><td>{r.sucursal}</td><td>{r.cajero}</td><td>{new Date(r.created_at).toLocaleString('es-MX')}</td></>}</tr>)}</tbody>
+        </table>}
+      </div>}
+
+      {tab==='top'&&top.length>0&&<table><thead><tr><th>#</th><th>Clave</th><th>Producto</th><th>Vendidos</th><th>Monto</th></tr></thead>
+        <tbody>{top.map((p,i)=><tr key={i}><td><b>{i+1}</b></td><td>{p.clave}</td><td>{p.nombre}</td><td><b>{p.total_vendido}</b></td><td>${Number(p.total_monto).toFixed(2)}</td></tr>)}</tbody>
+      </table>}
+
+      {tab==='tickets'&&<div>
+        <table><thead><tr><th>Ticket</th><th>Fecha</th><th>Sucursal</th><th>Cajero</th><th>Cliente</th><th>Total</th><th>Pago</th><th></th></tr></thead>
+          <tbody>{ventas.map(v=><tr key={v.id}><td><b>{v.ticket_numero}</b></td><td>{new Date(v.created_at).toLocaleString('es-MX')}</td>
+            <td>{v.sucursal_nombre}</td><td>{v.cajero_nombre}</td><td>{v.cliente_nombre||'-'}</td>
+            <td><b>${v.total.toFixed(2)}</b></td><td><span className="pill pill-gr">{v.tipo_pago}</span></td>
+            <td><button className="btn btn-p btn-sm" onClick={()=>verTicket(v.id)}><i className="fas fa-eye"/> Ver</button></td></tr>)}</tbody>
+        </table>
+      </div>}
+
+      {\!data&&tab==='ventas'&&<div className="empty"><i className="fas fa-chart-bar"/><p>Selecciona filtros y presiona Buscar</p></div>}
+    </div>
+
+    {selectedVenta&&<div className="modal-ov"><div className="modal">
+      <div className="ticket">
+        <div className="ctr"><b>TORNILLOS Y HULES</b><br/>AUTOMOTRICES HERGON<br/>{selectedVenta.sucursal_nombre}<br/>{selectedVenta.sucursal_direccion}</div>
+        <div className="ln"/><div><b>Ticket:</b> {selectedVenta.ticket_numero}<br/><b>Fecha:</b> {new Date(selectedVenta.created_at).toLocaleString('es-MX')}<br/><b>Cajero:</b> {selectedVenta.cajero_nombre}
+          {selectedVenta.cliente_nombre&&<><br/><b>Cliente:</b> {selectedVenta.cliente_nombre}</>}</div>
+        <div className="ln"/>
+        <table><thead><tr><td><b>Prod</b></td><td><b>Cant</b></td><td><b>P.U.</b></td><td style={{textAlign:'right'}}><b>Subt</b></td></tr></thead>
+          <tbody>{selectedVenta.detalles.map((d,i)=><tr key={i}><td>{d.clave}</td><td>{d.cantidad}</td><td>${d.precio_unitario.toFixed(2)}</td><td style={{textAlign:'right'}}>${d.subtotal.toFixed(2)}</td></tr>)}</tbody>
+        </table>
+        <div className="ln"/>
+        <div style={{fontSize:16,fontWeight:800}}>TOTAL: ${selectedVenta.total.toFixed(2)}</div>
+        <div>Pago: {selectedVenta.tipo_pago.toUpperCase()}</div>
+        <div className="ln"/><div className="ctr">¡Gracias por su compra\!</div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'center'}}>
+        <button className="btn btn-p" onClick={()=>window.print()}><i className="fas fa-print"/> Reimprimir</button>
+        <button className="btn btn-o" onClick={()=>setSelectedVenta(null)}>Cerrar</button>
+      </div>
+    </div></div>}
+  </div>);
+}
+
+// === NOTIFICACIONES PANEL ===
+function NotifPanel({open,onClose}){
+  const[notifs,setNotifs]=useState([]);
+  useEffect(()=>{if(open)api('/notificaciones').then(setNotifs)},[open]);
+  const marcarLeida=async id=>{await api(`/notificaciones/${id}/leer`,{method:'POST'});setNotifs(n=>n.map(x=>x.id===id?{...x,leida:1}:x))};
+
+  return(<div className={`npanel ${open?'open':''}`}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+      <h3><i className="fas fa-bell"/> Notificaciones</h3>
+      <button className="btn btn-o btn-sm" onClick={onClose}><i className="fas fa-times"/></button>
+    </div>
+    {notifs.map(n=><div key={n.id} className={`nitem t-${n.tipo} ${\!n.leida?'unread':''}`} onClick={()=>marcarLeida(n.id)}>
+      <div style={{fontWeight:600,marginBottom:2}}>{n.mensaje}</div>
+      <div style={{color:'var(--txtl)',fontSize:11}}>{n.sucursal_nombre&&`${n.sucursal_nombre} · `}{new Date(n.created_at).toLocaleString('es-MX')}</div>
+    </div>)}
+    {notifs.length===0&&<div className="empty"><i className="fas fa-bell-slash"/><p>Sin notificaciones</p></div>}
+  </div>);
+}
+
+// === APP PRINCIPAL ===
+function App(){
+  const[user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('user'))}catch(e){return null}});
+  const[page,setPage]=useState('dashboard');const[notifOpen,setNotifOpen]=useState(false);const[unread,setUnread]=useState(0);
+
+  useEffect(()=>{
+    if(\!user)return;
+    const loadUnread=()=>api('/notificaciones/no-leidas').then(d=>setUnread(d.count)).catch(()=>{});
+    loadUnread();const iv=setInterval(loadUnread,15000);
+    socket.on('notificacion',()=>loadUnread());
+    return()=>{clearInterval(iv);socket.off('notificacion')};
+  },[user]);
+
+  const logout=()=>{localStorage.removeItem('token');localStorage.removeItem('user');setUser(null)};
+  if(\!user)return <Login onLogin={setUser}/>;
+
+  const titles={dashboard:'Dashboard',pos:'Punto de Venta',inventario:'Inventario',cortes:'Cortes de Caja',clientes:'Clientes',promociones:'Promociones',usuarios:'Usuarios',reportes:'Reportes'};
+
+  return(<div>
+    <Sidebar page={page} setPage={setPage} user={user} onLogout={logout}/>
+    <div className="main">
+      <div className="topbar no-print">
+        <h1>{titles[page]||'HERGON POS'}</h1>
+        <div className="topbar-act">
+          <span style={{fontSize:12,color:'var(--txtl)'}}>{user.sucursal_nombre}</span>
+          <button className="nbtn" onClick={()=>{setNotifOpen(\!notifOpen);if(\!notifOpen)setUnread(0)}}>
+            <i className="fas fa-bell"/>{unread>0&&<span className="badge">{unread>99?'99+':unread}</span>}
+          </button>
+        </div>
+      </div>
+      {page==='dashboard'&&<Dashboard/>}
+      {page==='pos'&&<POS user={user}/>}
+      {page==='inventario'&&<Inventario user={user}/>}
+      {page==='cortes'&&<Cortes user={user}/>}
+      {page==='clientes'&&<Clientes user={user}/>}
+      {page==='promociones'&&<Promociones/>}
+      {page==='usuarios'&&<Usuarios/>}
+      {page==='reportes'&&<Reportes/>}
+    </div>
+    <NotifPanel open={notifOpen} onClose={()=>setNotifOpen(false)}/>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
