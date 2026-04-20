@@ -21,6 +21,13 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
+
+// Servir dependencias locales (sin depender de CDN)
+app.use('/lib/react', express.static(path.join(__dirname, 'node_modules/react/umd')));
+app.use('/lib/react-dom', express.static(path.join(__dirname, 'node_modules/react-dom/umd')));
+app.use('/lib/babel', express.static(path.join(__dirname, 'node_modules/@babel/standalone')));
+app.use('/lib/fontawesome', express.static(path.join(__dirname, 'node_modules/@fortawesome/fontawesome-free')));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ===================== MIDDLEWARE AUTH =====================
@@ -574,15 +581,6 @@ server.listen(PORT, () => {
   console.log(`========================================`);
   console.log(`  Admin: usuario=admin, password=admin123, PIN=1234`);
   console.log(`  Cajero: usuario=maria (o juan/ana/pedro/etc), password=cajero123`);
-  console.log(`========================================\n`);
-});
-
-} // end startServer
-
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
   console.log(`========================================\n`);
 });
 

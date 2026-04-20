@@ -1,14 +1,15 @@
-<\!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HERGON POS - Sistema de Gestión</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <!-- Dependencias locales (no requieren internet) -->
+  <script src="/lib/react/react.production.min.js"></script>
+  <script src="/lib/react-dom/react-dom.production.min.js"></script>
+  <script src="/lib/babel/babel.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link href="/lib/fontawesome/css/all.min.css" rel="stylesheet">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e}
@@ -92,7 +93,7 @@
     .tab-bar{display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--brd)}
     .tab{padding:8px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txtl);border-bottom:2px solid transparent;margin-bottom:-2px;transition:.2s}
     .tab.active{color:var(--p);border-bottom-color:var(--p)}.tab:hover:not(.active){color:var(--txt)}
-    @media print{.sidebar,.topbar,.no-print{display:none\!important}.main{margin-left:0\!important}.content{padding:0\!important}}
+    @media print{.sidebar,.topbar,.no-print{display:none!important}.main{margin-left:0!important}.content{padding:0!important}}
   </style>
 </head>
 <body>
@@ -109,7 +110,7 @@ async function api(path,opts={}){
   if(tk)h['Authorization']='Bearer '+tk;
   const r=await fetch(API+path,{...opts,headers:{...h,...(opts.headers||{})}});
   const d=await r.json();
-  if(\!r.ok)throw new Error(d.error||'Error');
+  if(!r.ok)throw new Error(d.error||'Error');
   return d;
 }
 
@@ -166,7 +167,7 @@ function Sidebar({page,setPage,user,onLogout}){
 function Dashboard(){
   const[d,setD]=useState(null);
   useEffect(()=>{api('/dashboard').then(setD).catch(console.error)},[]);
-  if(\!d)return <div className="content"><p>Cargando...</p></div>;
+  if(!d)return <div className="content"><p>Cargando...</p></div>;
   return(<div className="content">
     <div className="stats-grid">
       <div className="stat-card"><i className="fas fa-shopping-cart si"/><div className="sv">{d.ventas_hoy.num}</div><div className="sl">Ventas hoy</div></div>
@@ -202,12 +203,12 @@ function POS({user}){
     });
   };
   const updQty=(pid,delta)=>{setCart(c=>c.map(i=>{
-    if(i.producto_id\!==pid)return i;
+    if(i.producto_id!==pid)return i;
     const nq=Math.max(0,i.cantidad+delta);
     let pr=i.p_men;if(nq>=i.c_may)pr=i.p_may;else if(nq>=i.c_mmed)pr=i.p_mmed;
     return nq===0?null:{...i,cantidad:nq,precio:pr};
   }).filter(Boolean))};
-  const removeItem=pid=>setCart(c=>c.filter(i=>i.producto_id\!==pid));
+  const removeItem=pid=>setCart(c=>c.filter(i=>i.producto_id!==pid));
   const subtotal=cart.reduce((s,i)=>s+i.precio*i.cantidad,0);
 
   const completeSale=async(adminId)=>{
@@ -223,7 +224,7 @@ function POS({user}){
 
   const handlePay=()=>{
     if(cart.length===0)return alert('Agrega productos al carrito');
-    if(tipoPago==='tarjeta'&&user.rol\!=='administrador'){setShowPin(true);setPin('');setPinErr('');return}
+    if(tipoPago==='tarjeta'&&user.rol!=='administrador'){setShowPin(true);setPin('');setPinErr('');return}
     completeSale();
   };
   const verifyPin=async()=>{
@@ -337,7 +338,7 @@ function POS({user}){
         {showTicket.descuento_membresia>0&&<div>Desc. membresía: -${showTicket.descuento_membresia.toFixed(2)}</div>}
         <div style={{fontSize:16,fontWeight:800}}>TOTAL: ${showTicket.total.toFixed(2)}</div>
         <div>Pago: {showTicket.tipo_pago.toUpperCase()}</div>
-        <div className="ln"/><div className="ctr">¡Gracias por su compra\!</div>
+        <div className="ln"/><div className="ctr">¡Gracias por su compra!</div>
       </div>
       <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'center'}} className="no-print">
         <button className="btn btn-p" onClick={()=>window.print()}><i className="fas fa-print"/> Imprimir</button>
@@ -421,7 +422,7 @@ function Cortes({user}){
   useEffect(()=>{if(tab==='hacer')api('/cortes/resumen').then(setResumen);else api(`/cortes?${isAdmin?'':'cajero_id='+user.id}`).then(setCortes)},[tab]);
 
   const hacerCorte=async()=>{
-    if(\!monto)return alert('Ingresa el monto en caja');
+    if(!monto)return alert('Ingresa el monto en caja');
     try{const r=await api('/cortes',{method:'POST',body:JSON.stringify({monto_real:parseFloat(monto)})});
       alert(`Corte registrado. Diferencia: $${r.diferencia.toFixed(2)}`);setMonto('');setTab('historial');
     }catch(e){alert(e.message)}};
@@ -594,7 +595,7 @@ function Usuarios(){
       <h3>{edit?'Editar':'Nuevo'} Usuario</h3>
       <div className="g2">
         <div className="fg"><label>Nombre completo</label><input value={f.nombre} onChange={e=>setF({...f,nombre:e.target.value})}/></div>
-        <div className="fg"><label>Usuario</label><input value={f.usuario} onChange={e=>setF({...f,usuario:e.target.value})} disabled={\!\!edit}/></div>
+        <div className="fg"><label>Usuario</label><input value={f.usuario} onChange={e=>setF({...f,usuario:e.target.value})} disabled={!!edit}/></div>
       </div>
       <div className="g2">
         <div className="fg"><label>{edit?'Nueva contraseña (dejar vacío para no cambiar)':'Contraseña'}</label><input type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></div>
@@ -671,7 +672,7 @@ function Reportes(){
         </table>
       </div>}
 
-      {\!data&&tab==='ventas'&&<div className="empty"><i className="fas fa-chart-bar"/><p>Selecciona filtros y presiona Buscar</p></div>}
+      {!data&&tab==='ventas'&&<div className="empty"><i className="fas fa-chart-bar"/><p>Selecciona filtros y presiona Buscar</p></div>}
     </div>
 
     {selectedVenta&&<div className="modal-ov"><div className="modal">
@@ -686,7 +687,7 @@ function Reportes(){
         <div className="ln"/>
         <div style={{fontSize:16,fontWeight:800}}>TOTAL: ${selectedVenta.total.toFixed(2)}</div>
         <div>Pago: {selectedVenta.tipo_pago.toUpperCase()}</div>
-        <div className="ln"/><div className="ctr">¡Gracias por su compra\!</div>
+        <div className="ln"/><div className="ctr">¡Gracias por su compra!</div>
       </div>
       <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'center'}}>
         <button className="btn btn-p" onClick={()=>window.print()}><i className="fas fa-print"/> Reimprimir</button>
@@ -707,7 +708,7 @@ function NotifPanel({open,onClose}){
       <h3><i className="fas fa-bell"/> Notificaciones</h3>
       <button className="btn btn-o btn-sm" onClick={onClose}><i className="fas fa-times"/></button>
     </div>
-    {notifs.map(n=><div key={n.id} className={`nitem t-${n.tipo} ${\!n.leida?'unread':''}`} onClick={()=>marcarLeida(n.id)}>
+    {notifs.map(n=><div key={n.id} className={`nitem t-${n.tipo} ${!n.leida?'unread':''}`} onClick={()=>marcarLeida(n.id)}>
       <div style={{fontWeight:600,marginBottom:2}}>{n.mensaje}</div>
       <div style={{color:'var(--txtl)',fontSize:11}}>{n.sucursal_nombre&&`${n.sucursal_nombre} · `}{new Date(n.created_at).toLocaleString('es-MX')}</div>
     </div>)}
@@ -721,7 +722,7 @@ function App(){
   const[page,setPage]=useState('dashboard');const[notifOpen,setNotifOpen]=useState(false);const[unread,setUnread]=useState(0);
 
   useEffect(()=>{
-    if(\!user)return;
+    if(!user)return;
     const loadUnread=()=>api('/notificaciones/no-leidas').then(d=>setUnread(d.count)).catch(()=>{});
     loadUnread();const iv=setInterval(loadUnread,15000);
     socket.on('notificacion',()=>loadUnread());
@@ -729,7 +730,7 @@ function App(){
   },[user]);
 
   const logout=()=>{localStorage.removeItem('token');localStorage.removeItem('user');setUser(null)};
-  if(\!user)return <Login onLogin={setUser}/>;
+  if(!user)return <Login onLogin={setUser}/>;
 
   const titles={dashboard:'Dashboard',pos:'Punto de Venta',inventario:'Inventario',cortes:'Cortes de Caja',clientes:'Clientes',promociones:'Promociones',usuarios:'Usuarios',reportes:'Reportes'};
 
@@ -740,7 +741,7 @@ function App(){
         <h1>{titles[page]||'HERGON POS'}</h1>
         <div className="topbar-act">
           <span style={{fontSize:12,color:'var(--txtl)'}}>{user.sucursal_nombre}</span>
-          <button className="nbtn" onClick={()=>{setNotifOpen(\!notifOpen);if(\!notifOpen)setUnread(0)}}>
+          <button className="nbtn" onClick={()=>{setNotifOpen(!notifOpen);if(!notifOpen)setUnread(0)}}>
             <i className="fas fa-bell"/>{unread>0&&<span className="badge">{unread>99?'99+':unread}</span>}
           </button>
         </div>
