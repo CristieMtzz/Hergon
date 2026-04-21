@@ -1,4 +1,6 @@
-﻿node_modules/
+node_modules/
 hergon.db
 .env
 *.log
+.DS_Store
+server-async.js

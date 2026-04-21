@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a5f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icon-192.svg">
+  <link rel="apple-touch-icon" href="/icon-192.svg">
   <title>HERGON POS - Sistema de Gestión</title>
   <!-- Dependencias locales (no requieren internet) -->
   <script src="/lib/react/react.production.min.js"></script>
@@ -94,6 +100,31 @@
     .tab{padding:8px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txtl);border-bottom:2px solid transparent;margin-bottom:-2px;transition:.2s}
     .tab.active{color:var(--p);border-bottom-color:var(--p)}.tab:hover:not(.active){color:var(--txt)}
     @media print{.sidebar,.topbar,.no-print{display:none!important}.main{margin-left:0!important}.content{padding:0!important}}
+    /* PWA: Connection indicator */
+    .conn-status{display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+    .conn-online{background:#dcfce7;color:#166534}.conn-offline{background:#fee2e2;color:#991b1b}
+    .conn-syncing{background:#fef9c3;color:#854d0e}
+    .conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .conn-dot.on{background:#22c55e}.conn-dot.off{background:#ef4444;animation:blink 1s infinite}
+    .conn-dot.sync{background:#f59e0b;animation:blink .5s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .offline-badge{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#991b1b;color:#fff;padding:10px 24px;border-radius:12px;font-weight:700;font-size:14px;z-index:300;box-shadow:0 4px 20px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px}
+    .offline-queue-badge{background:#854d0e}
+    /* AI Assistant */
+    .ai-panel{position:fixed;right:0;bottom:0;width:380px;height:500px;background:#fff;box-shadow:-4px -4px 20px rgba(0,0,0,.15);z-index:160;border-radius:16px 0 0 0;display:flex;flex-direction:column;transform:translateY(100%);transition:.3s}
+    .ai-panel.open{transform:translateY(0)}
+    .ai-hdr{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:14px 16px;border-radius:16px 0 0 0;display:flex;justify-content:space-between;align-items:center}
+    .ai-hdr h3{font-size:14px;margin:0}.ai-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+    .ai-msg{padding:10px 12px;border-radius:12px;font-size:13px;max-width:90%;line-height:1.4}
+    .ai-msg.bot{background:#eff6ff;color:#1e3a5f;align-self:flex-start;border-bottom-left-radius:4px}
+    .ai-msg.user{background:#1a56db;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+    .ai-msg .ai-prods{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+    .ai-msg .ai-prod{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:6px 8px;font-size:11px;cursor:pointer;transition:.2s}
+    .ai-msg .ai-prod:hover{border-color:#1a56db;background:#f0f4ff}
+    .ai-input{display:flex;gap:6px;padding:10px 12px;border-top:1px solid #e5e7eb}
+    .ai-input input{flex:1;border-radius:20px;padding:8px 14px;font-size:13px}
+    .ai-fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;border:none;cursor:pointer;font-size:22px;box-shadow:0 4px 15px rgba(30,58,95,.4);z-index:155;display:flex;align-items:center;justify-content:center;transition:.2s}
+    .ai-fab:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(30,58,95,.5)}
   </style>
 </head>
 <body>
@@ -101,7 +132,116 @@
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback}=React;
 const API=window.location.origin+'/api';
-const socket=io(window.location.origin);
+const socket=io(window.location.origin,{reconnection:true,reconnectionDelay:2000,reconnectionAttempts:Infinity});
+
+// === PWA: Service Worker Registration ===
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/service-worker.js').then(reg=>{
+    console.log('[PWA] Service Worker registrado');
+    reg.addEventListener('updatefound',()=>{
+      const nw=reg.installing;
+      nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller){console.log('[PWA] Nueva version disponible');nw.postMessage({type:'SKIP_WAITING'})}});
+    });
+  }).catch(e=>console.warn('[PWA] SW error:',e));
+  navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='SYNC_VENTAS')HergonOffline.syncQueue()});
+}
+
+// === IndexedDB: Cola Offline ===
+const HergonOffline={
+  DB_NAME:'hergon_offline',DB_VER:1,
+  _db:null,
+  open(){
+    return new Promise((res,rej)=>{
+      if(this._db)return res(this._db);
+      const rq=indexedDB.open(this.DB_NAME,this.DB_VER);
+      rq.onupgradeneeded=e=>{
+        const db=e.target.result;
+        if(!db.objectStoreNames.contains('ventas_queue'))db.createObjectStore('ventas_queue',{keyPath:'offline_id',autoIncrement:true});
+        if(!db.objectStoreNames.contains('productos_cache'))db.createObjectStore('productos_cache',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('categorias_cache'))db.createObjectStore('categorias_cache',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('clientes_cache'))db.createObjectStore('clientes_cache',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});
+      };
+      rq.onsuccess=e=>{this._db=e.target.result;res(this._db)};
+      rq.onerror=e=>rej(e.target.error);
+    });
+  },
+  async addVenta(venta){
+    const db=await this.open();
+    const tx=db.transaction('ventas_queue','readwrite');
+    venta.timestamp_offline=new Date().toISOString();
+    tx.objectStore('ventas_queue').add(venta);
+    return new Promise((res,rej)=>{tx.oncomplete=()=>res(true);tx.onerror=e=>rej(e)});
+  },
+  async getQueue(){
+    const db=await this.open();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction('ventas_queue','readonly');
+      const rq=tx.objectStore('ventas_queue').getAll();
+      rq.onsuccess=()=>res(rq.result);rq.onerror=e=>rej(e);
+    });
+  },
+  async clearQueue(ids){
+    const db=await this.open();
+    const tx=db.transaction('ventas_queue','readwrite');
+    const store=tx.objectStore('ventas_queue');
+    ids.forEach(id=>store.delete(id));
+    return new Promise((res,rej)=>{tx.oncomplete=()=>res(true);tx.onerror=e=>rej(e)});
+  },
+  async getQueueCount(){
+    const db=await this.open();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction('ventas_queue','readonly');
+      const rq=tx.objectStore('ventas_queue').count();
+      rq.onsuccess=()=>res(rq.result);rq.onerror=()=>res(0);
+    });
+  },
+  async cacheData(storeName,data){
+    const db=await this.open();
+    const tx=db.transaction(storeName,'readwrite');
+    const store=tx.objectStore(storeName);
+    store.clear();
+    data.forEach(item=>store.put(item));
+    return new Promise((res,rej)=>{tx.oncomplete=()=>res(true);tx.onerror=e=>rej(e)});
+  },
+  async getCachedData(storeName){
+    const db=await this.open();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(storeName,'readonly');
+      const rq=tx.objectStore(storeName).getAll();
+      rq.onsuccess=()=>res(rq.result);rq.onerror=()=>res([]);
+    });
+  },
+  async refreshCache(sucursalId){
+    try{
+      const data=await api(`/cache/productos?sucursal_id=${sucursalId||''}`);
+      if(data.productos)await this.cacheData('productos_cache',data.productos);
+      if(data.categorias)await this.cacheData('categorias_cache',data.categorias);
+      if(data.clientes)await this.cacheData('clientes_cache',data.clientes);
+      const db=await this.open();
+      const tx=db.transaction('meta','readwrite');
+      tx.objectStore('meta').put({key:'last_cache',value:new Date().toISOString()});
+      console.log('[Offline] Cache actualizado:',data.productos?.length,'productos');
+      return true;
+    }catch(e){console.warn('[Offline] No se pudo actualizar cache:',e);return false}
+  },
+  async syncQueue(){
+    const queue=await this.getQueue();
+    if(queue.length===0)return{ok:true,count:0};
+    try{
+      const tk=localStorage.getItem('token');
+      const resp=await fetch(API+'/sync/ventas',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify({ventas_offline:queue})});
+      const data=await resp.json();
+      if(data.resultados){
+        const okIds=data.resultados.filter(r=>r.status==='ok').map(r=>r.offline_id);
+        if(okIds.length>0)await this.clearQueue(okIds);
+      }
+      return{ok:true,count:data.sincronizadas||0,errors:data.errores||0};
+    }catch(e){console.warn('[Sync] Error:',e);return{ok:false,error:e.message}}
+  }
+};
+// Init IndexedDB early
+HergonOffline.open();
 
 // === API Helper ===
 async function api(path,opts={}){
@@ -192,8 +332,19 @@ function POS({user}){
   const[pin,setPin]=useState('');const[pinErr,setPinErr]=useState('');const[searchCli,setSearchCli]=useState('');
   const[showCli,setShowCli]=useState(false);
 
-  useEffect(()=>{api('/categorias').then(setCats).catch(console.error)},[]);
-  useEffect(()=>{const t=setTimeout(()=>{api(`/productos?q=${q}&categoria_id=${cat}&sucursal_id=${user.sucursal_id}`).then(setProds)},300);return()=>clearTimeout(t)},[q,cat]);
+  useEffect(()=>{api('/categorias').then(setCats).catch(async()=>{const c=await HergonOffline.getCachedData('categorias_cache');setCats(c)})},[]);
+  useEffect(()=>{const t=setTimeout(()=>{
+    if(navigator.onLine){api(`/productos?q=${q}&categoria_id=${cat}&sucursal_id=${user.sucursal_id}`).then(setProds).catch(async()=>{
+      const cached=await HergonOffline.getCachedData('productos_cache');
+      const filtered=cached.filter(p=>{if(q&&!p.clave.toLowerCase().includes(q.toLowerCase())&&!p.nombre.toLowerCase().includes(q.toLowerCase()))return false;if(cat&&p.categoria_id!=cat)return false;return true});
+      setProds(filtered.slice(0,200));
+    })}else{
+      HergonOffline.getCachedData('productos_cache').then(cached=>{
+        const filtered=cached.filter(p=>{if(q&&!p.clave.toLowerCase().includes(q.toLowerCase())&&!p.nombre.toLowerCase().includes(q.toLowerCase()))return false;if(cat&&p.categoria_id!=cat)return false;return true});
+        setProds(filtered.slice(0,200));
+      });
+    }
+  },300);return()=>clearTimeout(t)},[q,cat]);
 
   const addToCart=(prod)=>{
     setCart(c=>{const ex=c.find(i=>i.producto_id===prod.id);
@@ -215,11 +366,38 @@ function POS({user}){
     try{
       const body={items:cart.map(i=>({producto_id:i.producto_id,cantidad:i.cantidad})),tipo_pago:tipoPago,cliente_id:cliente?.id||null};
       if(adminId)body.autorizado_por=adminId;
+      if(!navigator.onLine){
+        // OFFLINE: save to IndexedDB queue
+        await HergonOffline.addVenta({...body,offline_id:Date.now()});
+        // Update local cache stock
+        const cached=await HergonOffline.getCachedData('productos_cache');
+        for(const item of body.items){const p=cached.find(x=>x.id===item.producto_id);if(p)p.stock_local=Math.max(0,(p.stock_local||0)-item.cantidad)}
+        await HergonOffline.cacheData('productos_cache',cached);
+        const offlineTicket={ticket_numero:'OFFLINE-'+Date.now(),total:subtotal,tipo_pago:tipoPago,sucursal_nombre:user.sucursal_nombre,
+          cajero_nombre:user.nombre,created_at:new Date().toISOString(),detalles:cart.map(i=>({clave:i.clave,cantidad:i.cantidad,precio_unitario:i.precio,subtotal:i.precio*i.cantidad})),
+          descuento_promocion:0,descuento_membresia:0,cliente_nombre:cliente?.nombre||null,offline:true};
+        setShowTicket(offlineTicket);setCart([]);setCliente(null);setTipoPago('efectivo');
+        // Refresh products from cache
+        const updatedProds=await HergonOffline.getCachedData('productos_cache');
+        setProds(updatedProds.filter(p=>{
+          if(q&&!p.clave.toLowerCase().includes(q.toLowerCase())&&!p.nombre.toLowerCase().includes(q.toLowerCase()))return false;
+          if(cat&&p.categoria_id!=cat)return false;return true;
+        }).slice(0,200));
+        return;
+      }
       const venta=await api('/ventas',{method:'POST',body:JSON.stringify(body)});
       setShowTicket(venta);setCart([]);setCliente(null);setTipoPago('efectivo');
       // refresh products
       api(`/productos?q=${q}&categoria_id=${cat}&sucursal_id=${user.sucursal_id}`).then(setProds);
-    }catch(e){alert('Error: '+e.message)}
+    }catch(e){
+      // Network error fallback: try offline
+      if(e.message==='Failed to fetch'||e.message.includes('NetworkError')){
+        const body={items:cart.map(i=>({producto_id:i.producto_id,cantidad:i.cantidad})),tipo_pago:tipoPago,cliente_id:cliente?.id||null};
+        await HergonOffline.addVenta({...body,offline_id:Date.now()});
+        alert('Venta guardada offline. Se sincronizara al recuperar la conexion.');
+        setCart([]);setCliente(null);setTipoPago('efectivo');
+      }else{alert('Error: '+e.message)}
+    }
   };
 
   const handlePay=()=>{
@@ -338,7 +516,8 @@ function POS({user}){
         {showTicket.descuento_membresia>0&&<div>Desc. membresía: -${showTicket.descuento_membresia.toFixed(2)}</div>}
         <div style={{fontSize:16,fontWeight:800}}>TOTAL: ${showTicket.total.toFixed(2)}</div>
         <div>Pago: {showTicket.tipo_pago.toUpperCase()}</div>
-        <div className="ln"/><div className="ctr">¡Gracias por su compra!</div>
+        {showTicket.offline&&<><div className="ln"/><div className="ctr" style={{color:'#991b1b',fontWeight:700}}>*** VENTA OFFLINE ***<br/>Pendiente de sincronizar</div></>}
+        <div className="ln"/><div className="ctr">Gracias por su compra!</div>
       </div>
       <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'center'}} className="no-print">
         <button className="btn btn-p" onClick={()=>window.print()}><i className="fas fa-print"/> Imprimir</button>
@@ -716,6 +895,100 @@ function NotifPanel({open,onClose}){
   </div>);
 }
 
+// === CONNECTION STATUS ===
+function ConnStatus(){
+  const[online,setOnline]=useState(navigator.onLine);
+  const[syncing,setSyncing]=useState(false);
+  const[queueCount,setQueueCount]=useState(0);
+  useEffect(()=>{
+    const goOnline=async()=>{setOnline(true);
+      const q=await HergonOffline.getQueueCount();
+      if(q>0){setSyncing(true);const r=await HergonOffline.syncQueue();setSyncing(false);
+        if(r.ok&&r.count>0)alert(`Se sincronizaron ${r.count} ventas offline exitosamente.`);
+        if(r.errors>0)alert(`${r.errors} ventas no pudieron sincronizarse. Revisa el inventario.`);
+      }
+      setQueueCount(0);HergonOffline.refreshCache();
+    };
+    const goOffline=()=>{setOnline(false)};
+    const checkQueue=async()=>{const c=await HergonOffline.getQueueCount();setQueueCount(c)};
+    window.addEventListener('online',goOnline);window.addEventListener('offline',goOffline);
+    const iv=setInterval(checkQueue,5000);checkQueue();
+    return()=>{window.removeEventListener('online',goOnline);window.removeEventListener('offline',goOffline);clearInterval(iv)};
+  },[]);
+  return(<>
+    <div className={`conn-status ${syncing?'conn-syncing':online?'conn-online':'conn-offline'}`}>
+      <span className={`conn-dot ${syncing?'sync':online?'on':'off'}`}/>
+      {syncing?'Sincronizando...':online?'En linea':'Sin conexion'}
+      {queueCount>0&&!syncing&&<span style={{marginLeft:4}}>({queueCount} pendiente{queueCount>1?'s':''})</span>}
+    </div>
+    {!online&&<div className="offline-badge"><i className="fas fa-wifi" style={{opacity:.6}}/> Modo Offline — Las ventas se guardan localmente</div>}
+    {queueCount>0&&online&&!syncing&&<div className="offline-badge offline-queue-badge"><i className="fas fa-sync"/> {queueCount} venta{queueCount>1?'s':''} pendiente{queueCount>1?'s':''} de sincronizar</div>}
+  </>);
+}
+
+// === AI ASSISTANT ===
+function AIAssistant({user,onAddToCart}){
+  const[open,setOpen]=useState(false);
+  const[msgs,setMsgs]=useState([{type:'bot',text:'Hola, soy el asistente HERGON. Puedo ayudarte a buscar productos, revisar precios y disponibilidad. Escribe lo que necesitas.'}]);
+  const[input,setInput]=useState('');const[loading,setLoading]=useState(false);
+  const msgsEnd=useRef(null);
+  useEffect(()=>{msgsEnd.current?.scrollIntoView({behavior:'smooth'})},[msgs]);
+
+  const send=async()=>{
+    if(!input.trim()||loading)return;
+    const q=input.trim();setInput('');
+    setMsgs(m=>[...m,{type:'user',text:q}]);setLoading(true);
+    try{
+      let data;
+      if(navigator.onLine){
+        data=await api(`/asistente?consulta=${encodeURIComponent(q)}&sucursal_id=${user.sucursal_id}`);
+      }else{
+        // Offline: search cached products
+        const cached=await HergonOffline.getCachedData('productos_cache');
+        const ql=q.toLowerCase();
+        const found=cached.filter(p=>p.nombre.toLowerCase().includes(ql)||p.clave.toLowerCase().includes(ql)||(p.descripcion||'').toLowerCase().includes(ql)).slice(0,15);
+        data={respuesta:found.length>0?`Encontre ${found.length} producto(s) en cache offline para "${q}".`:`No encontre "${q}" en el cache local. Intenta cuando vuelva la conexion.`,productos:found};
+      }
+      setMsgs(m=>[...m,{type:'bot',text:data.respuesta,productos:data.productos||[]}]);
+    }catch(e){
+      setMsgs(m=>[...m,{type:'bot',text:'Error al buscar: '+e.message}]);
+    }
+    setLoading(false);
+  };
+
+  return(<>
+    <button className="ai-fab no-print" onClick={()=>setOpen(!open)} title="Asistente HERGON">
+      <i className={`fas ${open?'fa-times':'fa-robot'}`}/>
+    </button>
+    <div className={`ai-panel ${open?'open':''} no-print`}>
+      <div className="ai-hdr">
+        <h3><i className="fas fa-robot"/> Asistente HERGON</h3>
+        <button style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:16}} onClick={()=>setOpen(false)}><i className="fas fa-chevron-down"/></button>
+      </div>
+      <div className="ai-msgs">
+        {msgs.map((m,i)=><div key={i} className={`ai-msg ${m.type}`}>
+          <div>{m.text}</div>
+          {m.productos&&m.productos.length>0&&<div className="ai-prods">
+            {m.productos.slice(0,8).map(p=><div key={p.id} className="ai-prod" onClick={()=>{if(onAddToCart&&(p.stock_local>0||p.stock_total>0))onAddToCart(p)}}>
+              <b>{p.clave}</b> — {p.nombre}<br/>
+              <span style={{color:'#059669'}}>${p.precio_menudeo?.toFixed(2)||'N/A'}</span>
+              {p.stock_local!==undefined?<span style={{marginLeft:8,color:p.stock_local>0?'#6b7280':'#dc2626'}}>Stock: {p.stock_local}</span>
+              :<span style={{marginLeft:8,color:'#6b7280'}}>Total: {p.stock_total}</span>}
+            </div>)}
+            {m.productos.length>8&&<div style={{fontSize:11,color:'#6b7280',textAlign:'center'}}>...y {m.productos.length-8} mas</div>}
+          </div>}
+        </div>)}
+        {loading&&<div className="ai-msg bot"><i className="fas fa-spinner fa-spin"/> Buscando...</div>}
+        <div ref={msgsEnd}/>
+      </div>
+      <div className="ai-input">
+        <input placeholder="Busca tornillos, hules, mangueras..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()}/>
+        <button className="btn btn-p" onClick={send} disabled={loading}><i className="fas fa-paper-plane"/></button>
+      </div>
+    </div>
+  </>);
+}
+
 // === APP PRINCIPAL ===
 function App(){
   const[user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('user'))}catch(e){return null}});
@@ -726,7 +999,10 @@ function App(){
     const loadUnread=()=>api('/notificaciones/no-leidas').then(d=>setUnread(d.count)).catch(()=>{});
     loadUnread();const iv=setInterval(loadUnread,15000);
     socket.on('notificacion',()=>loadUnread());
-    return()=>{clearInterval(iv);socket.off('notificacion')};
+    // Cache data for offline use periodically
+    HergonOffline.refreshCache(user.sucursal_id);
+    const cacheIv=setInterval(()=>HergonOffline.refreshCache(user.sucursal_id),300000); // every 5 min
+    return()=>{clearInterval(iv);clearInterval(cacheIv);socket.off('notificacion')};
   },[user]);
 
   const logout=()=>{localStorage.removeItem('token');localStorage.removeItem('user');setUser(null)};
@@ -740,6 +1016,7 @@ function App(){
       <div className="topbar no-print">
         <h1>{titles[page]||'HERGON POS'}</h1>
         <div className="topbar-act">
+          <ConnStatus/>
           <span style={{fontSize:12,color:'var(--txtl)'}}>{user.sucursal_nombre}</span>
           <button className="nbtn" onClick={()=>{setNotifOpen(!notifOpen);if(!notifOpen)setUnread(0)}}>
             <i className="fas fa-bell"/>{unread>0&&<span className="badge">{unread>99?'99+':unread}</span>}
@@ -756,6 +1033,7 @@ function App(){
       {page==='reportes'&&<Reportes/>}
     </div>
     <NotifPanel open={notifOpen} onClose={()=>setNotifOpen(false)}/>
+    <AIAssistant user={user} onAddToCart={page==='pos'?null:null}/>
   </div>);
 }
 
